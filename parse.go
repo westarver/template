@@ -8,10 +8,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"src/xpanda/local/helper"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/westarver/helper"
 
 	"github.com/bitfield/script"
 	"golang.design/x/clipboard"
@@ -19,7 +20,7 @@ import (
 
 const defExt = ".exec"
 
-//───────────────────┤ ParseFiles ├───────────────────
+//────────────┤ ParseFiles ├────────────
 //Output will be appended to existing files.
 func ParseFiles(inputs []string, outputs []string, w io.Writer) int {
 	var n, k int
