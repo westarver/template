@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/westarver/helper"
+	//trace "github.com/westarver/trace" //<rmv/>
 
 	"github.com/bitfield/script"
 	"golang.design/x/clipboard"
@@ -29,7 +30,7 @@ func ParseFiles(inputs []string, outputs []string, w io.Writer) int {
 
 	//the following is compensation for docopts inability to
 	//recognize the -- as a separator
-	tmpls, outs := splitOnDashDash(inputs, outputs)
+	tmpls, outs := helper.SplitOnDashDash(inputs, outputs)
 
 	if len(tmpls) == 0 {
 		o, _ := os.Stdin.Stat()
@@ -106,7 +107,7 @@ type pair struct {
 //for visual reasons only. They can be but it's not required.
 //"/d/p/e d p e" is equivalent to "/dpe d p e".  The directives
 //will work in any order, but the args must be in the same order
-//as the directives they reference.
+//as the directives they refer to.
 func matchio(ins []string, outs []string) []pair {
 	var matched []pair
 
@@ -263,7 +264,7 @@ func parseFile(path string, out string, w io.Writer) (int, error) {
 	}
 
 	if path == "stdin-term" {
-		fmt.Println("template v0.0.1")
+		fmt.Println(os.Args[0])
 		fmt.Print(">> ")
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
@@ -296,7 +297,6 @@ func parseFile(path string, out string, w io.Writer) (int, error) {
 		return 0, err
 	}
 	fmt.Fprintf(w, "Executing %s\n", path)
-	//data.Write(dat)
 	n = parse(dat, o, w)
 	return n, nil
 }
@@ -309,8 +309,8 @@ func parse(b []byte, out *os.File, w io.Writer) int {
 		"env":  envFunc,
 		"exec": execFunc,
 		"file": fileFunc,
-		"let":  letFunc,
 		"var":  varFunc,
+		"let":  letFunc,
 	}
 
 	var tmpl = template{
@@ -352,15 +352,31 @@ func splitOnDashDash(inputs, outputs []string) ([]string, []string) {
 	return inputs, outputs
 }
 
-// -------------------------------------
+// --------------------------------------
 //start of scanning functions and related
+
+const (
+	LPar        = `\050`
+	RPar        = `\051`
+	LBrk        = `\133`
+	RBrk        = `\135`
+	LBrc        = `\123`
+	RBrc        = `\125`
+	Aster       = `\052`
+	WS0         = `[\t ]*`
+	WS1         = `[\t ]+`
+	Any         = `[.]+`
+	TemplatePat = LBrc + LBrc + Any + RBrc + RBrc
+	IdentList   = IdentPat + WS0 + `(,` + WS1 + IdentPat + `)*`
+	IdentPat    = `_?[A-Za-z_]+[0-9]*`
+)
 
 const (
 	eof        = -1
 	newline    = 10
 	tab        = 9
-	leftDelim  = "{{"
-	rightDelim = "}}"
+	leftDelim  = LBrc + LBrc
+	rightDelim = RBrc + RBrc
 )
 
 type scanfunc func(*template) scanfunc
@@ -418,7 +434,7 @@ func (t *template) skipws() {
 }
 
 func (t *template) puts(word string) {
-	t.expanded.Write([]byte(word))
+	t.expanded.WriteString(word)
 }
 
 func (t *template) storeVar(v, val string) {
@@ -434,53 +450,31 @@ func (t *template) Pos() int {
 }
 
 func (t *template) insert(s string) {
-	// var trace = trace.New(os.Stdout)    //$|rmv|$
-	// defer trace.Trace("leaving insert") //$|rmv|$
-	// trace.Trace("entering insert")      //$|rmv|$
+	//var trace = trace.New(os.Stdout)    //<rmv/>
+	//defer trace.Trace("leaving insert") //<rmv/>
+	//trace.Trace("entering insert")      //<rmv/>
 
 	lhs := t.text[:t.Pos()]
 	rhs := t.text[t.Pos():]
 	t.text = lhs + s + rhs
-	//trace.Trace("insert s ", t.text) //$|rmv|$
+	//trace.Trace("insert s ", t.text) //<rmv/>
 }
 
-/* func (t *template) resetPos(amount int) {
-	if amount >= 0 {
-		for i := 0; i < amount; i++ {
-			_ = t.next()
-		}
-		return
-	}
-	var newpos = t.Pos() + amount
-	if newpos < 0 {
-		newpos = 0
-	}
-
-	tmp := t.text[newpos:t.Pos()]
-
-	lines := helper.CountLinesInString(tmp)
-	t.line -= lines
-	if t.line < 0 {
-		t.line = 0 // just in case
-	}
-	t.pos = newpos
-}
-*/
 func (t *template) toNextDelim(delim string) (string, int) {
-	// var trace = trace.New(os.Stdout)      /*$|rmv|$*/
-	// trace.Trace("entering t.toNextDelim") /*$|rmv|$*/
+	//var trace = trace.New(os.Stdout)      //<rmv/>
+	//trace.Trace("entering t.toNextDelim") //<rmv/>
 
 	var ret []rune
 	if ok := strings.Contains(t.text[t.Pos():], delim); ok {
 		i := strings.Index(t.text[t.Pos():], delim)
-		//trace.Trace("t.toNextDelim found ", delim, " at ", t.pos+i) /*$|rmv|$*/
+		//trace.Trace("t.toNextDelim found ", delim, " at ", t.pos+i) //<rmv/>
 		pos := t.Pos()
 		for j := pos; j < pos+i; j++ {
 			ret = append(ret, t.next())
-			//trace.Trace("ret = ", string(ret)) /*$|rmv|$*/
+			//trace.Trace("ret = ", string(ret)) //<rmv/>
 		}
-		//	trace.Trace("t.pos is ", t.Pos(), " and i is ", i)
-		//trace.Trace("t.toNextDelim returns *", string(ret), "*") /*$|rmv|$*/
+		//trace.Trace("t.pos is ", t.Pos(), " and i is ", i) //<rmv/>
+		//trace.Trace("t.toNextDelim returns *", string(ret), "*") //<rmv/>
 		return string(ret), t.Pos()
 	}
 	return t.text[t.Pos():], eof
@@ -489,11 +483,11 @@ func (t *template) toNextDelim(delim string) (string, int) {
 //─────────────┤ scanText ├─────────────
 
 func scanText(t *template) scanfunc {
-	// trace := trace.New(os.Stdout)    //$|rmv|$
-	// trace.Trace("entering scanText") /*$|rmv|$*/
+	//trace := trace.New(os.Stdout)    //<rmv/>
+	//trace.Trace("entering scanText") //<rmv/>
 	lhs, newpos := getToDelim(t, leftDelim)
-	// trace.Trace("t.pos is now ", t.Pos(), "*", newpos) /*$|rmv|$*/
-	//trace.Trace("lhs is *", lhs, "*")
+	//trace.Trace("t.pos is now ", t.Pos(), "*", newpos) //<rmv/>
+	//trace.Trace("lhs is *", lhs, "*") //<rmv/>
 	t.puts(lhs)
 	if newpos > 0 {
 		return scanForFunc
@@ -504,11 +498,11 @@ func scanText(t *template) scanfunc {
 //─────────────┤ scanForFunc ├─────────────
 
 func scanForFunc(t *template) scanfunc {
-	// trace := trace.New(os.Stdout)	//$|rmv|$
-	// trace.Trace("entering scanForFunc")	//$|rmv|$
+	//trace := trace.New(os.Stdout)	//<rmv/>
+	//trace.Trace("entering scanForFunc")	//<rmv/>
 
 	word := getNextWord(t)
-	//race.Trace("scanForFunc found ", word) //$|rmv|$
+	//race.Trace("scanForFunc found ", word) //<rmv/>
 
 	if word == "/*" {
 		return scanComment
@@ -516,15 +510,15 @@ func scanForFunc(t *template) scanfunc {
 	if fn := t.funcs[word]; fn != nil {
 		return fn
 	}
-	//trace.Trace("returning from scanForFunc with nil")
+	//trace.Trace("returning from scanForFunc with nil") //<rmv/>
 	return nil
 }
 
 //─────────────┤ scanToEnd ├─────────────
 
 func scanToEnd(t *template) scanfunc {
-	// var trace = trace.New(os.Stdout)  /*$|rmv|$*/
-	// trace.Trace("entering scanToEnd") /*$|rmv|$*/
+	//var trace = trace.New(os.Stdout)  //<rmv/>
+	//trace.Trace("entering scanToEnd") //<rmv/>
 	_, _ = getToDelim(t, rightDelim)
 	return scanText
 }
@@ -532,22 +526,22 @@ func scanToEnd(t *template) scanfunc {
 //─────────────┤ scanComment ├─────────────
 
 func scanComment(t *template) scanfunc {
-	// var trace = trace.New(os.Stdout)    /*$|rmv|$*/
-	// trace.Trace("entering scanComment") /*$|rmv|$*/
+	//var trace = trace.New(os.Stdout)    //<rmv/>
+	//trace.Trace("entering scanComment") //<rmv/>
 	return scanToEnd(t)
 }
 
 //─────────────┤ getNextWord ├─────────────
 
 func getNextWord(t *template) string {
-	// trace := trace.New(os.Stdout)
-	// trace.Trace("entering getNextWord")
+	//trace := trace.New(os.Stdout) //<rmv/>
+	//trace.Trace("entering getNextWord") //<rmv/>
 	t.skipws()
 	var ret []rune
 	var r rune
 	for {
 		r = t.next()
-		//trace.Trace("rune is ", r) /*$|rmv|$*/
+		//trace.Trace("rune is ", r) //<rmv/>
 		if r == eof {
 			break
 		}
@@ -571,19 +565,19 @@ func getNextWord(t *template) string {
 		}
 		ret = append(ret, r)
 	}
-	//trace.Trace("leaving getNextWord with ", string(ret))
+	//trace.Trace("leaving getNextWord with ", string(ret))//<rmv/>
 	return string(ret)
 }
 
 //─────────────┤ getToDelim ├─────────────
 
 func getToDelim(t *template, delim string) (string, int) {
-	//var trace = trace.New(os.Stdout) /*$|rmv|$*/
+	//var trace = trace.New(os.Stdout) //<rmv/>
 	s, n := t.toNextDelim(delim)
-	//trace.Trace("s = ", s) /*$|rmv|$*/
+	//trace.Trace("s = ", s) //<rmv/>
 	for i := 0; i < len(delim); i++ {
 		_ = t.next()
-		// trace.Trace("r = ", string(r)) /*$|rmv|$*/
+		//trace.Trace("r = ", string(r)) //<rmv/>
 		n++
 	}
 	return s, n
@@ -609,21 +603,21 @@ func clipFunc(t *template) scanfunc {
 func envFunc(t *template) scanfunc {
 	word := getNextWord(t)
 	if len(word) == 0 {
-		//trace.Trace("no arg to env function") /*$|rmv|$*/
+		//trace.Trace("no arg to env function") //<rmv/>
 		return scanToEnd
 	}
 	if !strings.HasPrefix(word, "$") {
-		//trace.Trace("no $ sign before ", word) /*$|rmv|$*/
+		//trace.Trace("no $ sign before ", word) //<rmv/>
 		t.puts(word)
 		return scanToEnd
 	}
 	en := os.Getenv(word[1:])
 	if len(en) == 0 {
 		t.puts(word) //could not translate. just move on
-		//trace.Trace("env var ", word, " is not set") /*$|rmv|$*/
+		//trace.Trace("env var ", word, " is not set") //<rmv/>
 	} else {
 		t.puts(en)
-		//trace.Trace("env var ", word, " is set to ", en) /*$|rmv|$*/
+		//trace.Trace("env var ", word, " is set to ", en) //<rmv/>
 	}
 	return scanToEnd
 }
@@ -644,12 +638,11 @@ func execFunc(t *template) scanfunc {
 //─────────────┤ fileFunc ├─────────────
 
 func fileFunc(t *template) scanfunc {
-	// trace := trace.New(os.Stdout) //$|rmv|$
-	// trace.Trace("entering fileFunc")//$|rmv|$
+	//trace := trace.New(os.Stdout) //<rmv/>
+	//trace.Trace("entering fileFunc")//<rmv/>
 	fn := getNextWord(t)
-	//	trace.Trace("include = ", fn) //$|rmv|$
+	//trace.Trace("include = ", fn) //<rmv/>
 	_, _ = getToDelim(t, rightDelim)
-	//	trace.Trace("junk = ", junk) //$|rmv|$
 	f, err := os.ReadFile(fn)
 	if err != nil {
 		return nil
@@ -661,14 +654,14 @@ func fileFunc(t *template) scanfunc {
 //─────────────┤ letFunc ├─────────────
 
 func letFunc(t *template) scanfunc {
-	// var trace = trace.New(os.Stdout) /*$|rmv|$*/
-	// trace.Trace("entering letFunc")  /*$|rmv|$*/
+	//var trace = trace.New(os.Stdout) //<rmv/>
+	//trace.Trace("entering letFunc")  //<rmv/>
 	v := getNextWord(t)
-	//trace.Trace("var = ", v, " pos is ", t.Pos()) /*$|rmv|$*/
+	//trace.Trace("var = ", v, " pos is ", t.Pos()) //<rmv/>
 	val, _ := getToDelim(t, rightDelim)
-	//trace.Trace("val = ", val) /*$|rmv|$*/
+	//trace.Trace("val = ", val) //<rmv/>
 	val = strings.Trim(val, " ")
-	//trace.Trace("let var ", v, " is set to ", val) /*$|rmv|$*/
+	//trace.Trace("let var ", v, " is set to ", val) //<rmv/>
 	t.storeVar(v, val)
 	return scanText
 }
@@ -676,11 +669,11 @@ func letFunc(t *template) scanfunc {
 //─────────────┤ varFunc ├─────────────
 
 func varFunc(t *template) scanfunc {
-	// trace := trace.New(os.Stdout)
-	// trace.Trace("entering varFunc")
+	//trace := trace.New(os.Stdout) //<rmv/>
+	//trace.Trace("entering varFunc") //<rmv/>
 	v := getNextWord(t)
 	val := t.getVar(v)
-	//trace.Trace("getVar returned *", val, "* for ", v) /*$|rmv|$*/
+	//trace.Trace("getVar returned *", val, "* for ", v) //<rmv/>
 	if len(val) > 0 {
 		t.puts(val)
 	} else {
